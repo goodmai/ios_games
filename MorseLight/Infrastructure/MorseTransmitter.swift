@@ -3,6 +3,7 @@ import Foundation
 actor MorseTransmitter {
     private let flashlight = FlashlightController()
     private let audio = MorseAudioEngine()
+    private let decoder = MorseAudioDecoder()
 
     private(set) var isTransmitting = false
 
@@ -33,14 +34,22 @@ actor MorseTransmitter {
         try audio.play(signals: signals)
     }
 
-    func stopSound() {
-        audio.stop()
-    }
+    func stopSound() { audio.stop() }
 
-    // MARK: Export
+    // MARK: Export — M4A (AAC, native iOS format)
 
     func exportAudio(signals: [MorseSignal]) throws -> URL {
-        try audio.exportURL(signals: signals)
+        try audio.exportM4A(signals: signals)
+    }
+
+    // MARK: Decode — audio file → Morse → text
+    // Runs on background thread; actor isolation ensures thread safety.
+
+    func decodeAudio(from url: URL) async throws -> String {
+        let dec = decoder   // capture value for Task.detached
+        return try await Task.detached(priority: .userInitiated) {
+            try dec.decode(from: url)
+        }.value
     }
 
     // MARK: Cleanup

@@ -20,6 +20,12 @@ final class AppViewModel {
     var audioShareURL: URL?
     var showShareSheet = false
 
+    // MARK: Decode state
+    var showDocumentPicker = false
+    var decodedText = ""
+    var isDecoding = false
+    var decodeError: String?
+
     // MARK: Torch manual toggle
     var manualTorchOn = false
 
@@ -144,6 +150,30 @@ final class AppViewModel {
                 showShareSheet = true
             } catch {
                 statusMessage = "Could not generate audio: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    // MARK: Import & decode audio
+
+    func importAndDecodeAudio() {
+        showDocumentPicker = true
+    }
+
+    func decodeAudio(from url: URL) {
+        isDecoding = true
+        decodedText = ""
+        decodeError = nil
+        Task {
+            defer {
+                url.stopAccessingSecurityScopedResource()
+                isDecoding = false
+            }
+            do {
+                let text = try await transmitter.decodeAudio(from: url)
+                decodedText = text.isEmpty ? "(no Morse detected)" : text
+            } catch {
+                decodeError = error.localizedDescription
             }
         }
     }

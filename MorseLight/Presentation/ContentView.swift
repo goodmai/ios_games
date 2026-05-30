@@ -11,6 +11,7 @@ struct ContentView: View {
                 flashlightSection
                 morseInputSection
                 transmissionSection
+                decodeSection
                 permissionsSection
             }
             .navigationTitle("MorseLight")
@@ -20,6 +21,12 @@ struct ContentView: View {
                 if let url = vm.audioShareURL {
                     ActivityViewController(activityItems: [url])
                         .presentationDetents([.medium, .large])
+                }
+            }
+            .sheet(isPresented: $vm.showDocumentPicker) {
+                DocumentPicker { url in
+                    vm.showDocumentPicker = false
+                    vm.decodeAudio(from: url)
                 }
             }
         }
@@ -143,7 +150,7 @@ struct ContentView: View {
             Button {
                 vm.prepareAudioShare()
             } label: {
-                Label("Share Audio (WAV)", systemImage: "square.and.arrow.up")
+                Label("Share Audio (M4A)", systemImage: "square.and.arrow.up")
                     .foregroundStyle(!vm.inputText.isEmpty ? .green : .secondary)
             }
             .disabled(vm.inputText.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -166,6 +173,68 @@ struct ContentView: View {
             }
         } header: {
             Label("Transmit", systemImage: "dot.radiowaves.left.and.right")
+        }
+    }
+
+    // MARK: - Decode Section
+
+    private var decodeSection: some View {
+        Section {
+            Button {
+                vm.importAndDecodeAudio()
+            } label: {
+                HStack {
+                    Label("Import Audio File", systemImage: "square.and.arrow.down")
+                        .foregroundStyle(.purple)
+                    Spacer()
+                    if vm.isDecoding {
+                        ProgressView().tint(.purple)
+                    }
+                }
+            }
+            .disabled(vm.isDecoding)
+
+            if let err = vm.decodeError {
+                Label(err, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            if !vm.decodedText.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Decoded Text")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(vm.decodedText)
+                        .font(.body)
+                        .textSelection(.enabled)
+
+                    HStack(spacing: 12) {
+                        Button {
+                            UIPasteboard.general.string = vm.decodedText
+                        } label: {
+                            Label("Copy", systemImage: "doc.on.doc")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.blue)
+
+                        Button {
+                            vm.inputText = vm.decodedText
+                        } label: {
+                            Label("Use as Input", systemImage: "arrow.up.doc")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.orange)
+                    }
+                    .font(.subheadline)
+                }
+                .padding(.vertical, 4)
+            }
+        } header: {
+            Label("Decode Audio", systemImage: "waveform.badge.magnifyingglass")
+        } footer: {
+            Text("Import an M4A/WAV audio file containing 700 Hz Morse code to decode it back to text.")
+                .font(.caption)
         }
     }
 
