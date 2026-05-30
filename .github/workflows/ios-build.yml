@@ -6,79 +6,124 @@ on:
   pull_request:
     branches: [ main ]
 
-# Cancel in-progress runs for the same branch
+# Cancel redundant runs on the same branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ─────────────────────────────────────────────
-  # Job 1: Build & Test MorseLight (Xcode 16, iOS 18)
-  # Supports iPhone 11+ (deployment target iOS 17)
-  # ─────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────
+  # Job 1: Build & Test MorseLight
+  # Runner: macos-15 (Xcode 16.x, iOS 18 SDK)
+  # Deployment target: iOS 17.0 → supports iPhone 11 and above
+  # ─────────────────────────────────────────────────────────────
   morse-light:
     name: MorseLight – Build & Test
-    runs-on: macos-15          # Xcode 16.x, iOS 18 SDK
+    runs-on: macos-15
 
     env:
       SCHEME: MorseLight
-      DESTINATION: platform=iOS Simulator,name=iPhone 16
       CONFIGURATION: Debug
+      DERIVED_DATA: /tmp/MorseLightDD
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── Xcode ───────────────────────────────
+      # Pick the latest Xcode 16.x installed on this runner —
+      # avoids hard-coding a patch version that may not exist.
       - name: Select Xcode 16
         run: |
-          sudo xcode-select -s /Applications/Xcode_16.2.app
+          XCODE=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then
+            echo "ERROR: No Xcode 16.x found in /Applications" && exit 1
+          fi
+          echo "Using Xcode: $XCODE"
+          sudo xcode-select -s "$XCODE"
           xcodebuild -version
-          xcrun simctl list devices available | grep "iPhone 16" | head -5
 
-      # ── Dependencies ────────────────────────
-      - name: Cache Homebrew packages
+      # Cache the installed xcodegen binary between runs.
+      # Key includes the arch so Intel / Apple Silicon caches don't collide.
+      - name: Cache xcodegen
+        id: cache-xcodegen
         uses: actions/cache@v4
         with:
-          path: ~/Library/Caches/Homebrew
-          key: brew-${{ runner.os }}-xcodegen
+          path: /opt/homebrew/bin/xcodegen
+          key: xcodegen-${{ runner.os }}-${{ runner.arch }}-2.x
 
       - name: Install xcodegen
-        run: |
-          brew install xcodegen || brew upgrade xcodegen
-          xcodegen version
+        if: steps.cache-xcodegen.outputs.cache-hit != 'true'
+        run: brew install xcodegen
 
-      # ── Generate project ────────────────────
+      - name: Show xcodegen version
+        run: xcodegen --version
+
+      # Generate MorseLight.xcodeproj from project.yml
       - name: Generate Xcode project
         run: xcodegen generate --spec project.yml
 
-      # ── Build ───────────────────────────────
+      # Resolve the best available iPhone simulator UDID at runtime.
+      # Prefers iPhone 16, falls back to any available iPhone.
+      - name: Resolve simulator
+        id: sim
+        run: |
+          UDID=$(
+            xcrun simctl list devices available -j | python3 - <<'PY'
+          import json, sys
+          data = json.load(open('/dev/stdin'))
+          candidates = []
+          for runtime, devices in data["devices"].items():
+              if "iOS" not in runtime:
+                  continue
+              for d in devices:
+                  if d.get("isAvailable") and "iPhone" in d["name"]:
+                      candidates.append((runtime, d["name"], d["udid"]))
+          # prefer iPhone 16 (non-Pro/Plus/Max), then any iPhone
+          preferred = [c for c in candidates if "iPhone 16" in c[1]
+                       and not any(x in c[1] for x in ("Pro", "Plus", "Max"))]
+          pick = preferred[0] if preferred else (candidates[0] if candidates else None)
+          if pick:
+              print(pick[2])
+              import sys; print(f"Selected: {pick[1]} ({pick[0]})", file=sys.stderr)
+          PY
+          )
+          if [ -z "$UDID" ]; then
+            echo "ERROR: No available iPhone simulator found" && exit 1
+          fi
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Simulator UDID: $UDID"
+
+      # Boot the simulator now so xcodebuild test doesn't time out waiting
+      - name: Boot simulator
+        run: |
+          xcrun simctl boot "${{ steps.sim.outputs.udid }}" || true
+
       - name: Build (Debug)
         run: |
           set -o pipefail
           xcodebuild build \
             -scheme "$SCHEME" \
-            -destination "$DESTINATION" \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
             -configuration "$CONFIGURATION" \
+            -derivedDataPath "$DERIVED_DATA" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             ONLY_ACTIVE_ARCH=YES \
             2>&1 | tee /tmp/build.log
 
-      # ── Test ────────────────────────────────
       - name: Run unit tests
         run: |
           set -o pipefail
           xcodebuild test \
             -scheme "$SCHEME" \
-            -destination "$DESTINATION" \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
             -configuration "$CONFIGURATION" \
+            -derivedDataPath "$DERIVED_DATA" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             -resultBundlePath TestResults.xcresult \
             2>&1 | tee /tmp/test.log
 
-      # ── Artifacts ───────────────────────────
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -87,7 +132,7 @@ jobs:
           path: TestResults.xcresult
           if-no-files-found: ignore
 
-      - name: Upload build log on failure
+      - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -96,10 +141,9 @@ jobs:
             /tmp/build.log
             /tmp/test.log
 
-  # ─────────────────────────────────────────────
-  # Job 2: SPM tests for GameTemplate logic layer
-  # Runs on Linux for speed (pure Swift, no UIKit)
-  # ─────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────
+  # Job 2: GameTemplate SPM unit tests (pure Swift, no UIKit)
+  # ─────────────────────────────────────────────────────────────
   game-template:
     name: GameTemplate – Swift Package Tests
     runs-on: macos-15
@@ -108,7 +152,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          swift --version
 
       - name: Resolve dependencies
         run: swift package resolve
