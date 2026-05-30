@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(swift test*)",
+      "Bash(swift build*)",
+      "Bash(swift package*)",
+      "Bash(swiftlint*)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(find . -name '*.swift'*)",
+      "Bash(grep -r * Sources/)",
+      "Bash(grep -r * Tests/)",
+      "Bash(ls *)",
+      "Bash(cat Scripts/*)",
+      "Bash(bash Scripts/*.sh)"
+    ]
+  }
+}
