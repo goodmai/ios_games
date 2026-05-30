@@ -1,0 +1,120 @@
+name: iOS Build & Test
+
+on:
+  push:
+    branches: [ main, "claude/**" ]
+  pull_request:
+    branches: [ main ]
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Job 1: Build & Test MorseLight (Xcode 16, iOS 18)
+  # Supports iPhone 11+ (deployment target iOS 17)
+  # ─────────────────────────────────────────────
+  morse-light:
+    name: MorseLight – Build & Test
+    runs-on: macos-15          # Xcode 16.x, iOS 18 SDK
+
+    env:
+      SCHEME: MorseLight
+      DESTINATION: platform=iOS Simulator,name=iPhone 16
+      CONFIGURATION: Debug
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Xcode ───────────────────────────────
+      - name: Select Xcode 16
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app
+          xcodebuild -version
+          xcrun simctl list devices available | grep "iPhone 16" | head -5
+
+      # ── Dependencies ────────────────────────
+      - name: Cache Homebrew packages
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: brew-${{ runner.os }}-xcodegen
+
+      - name: Install xcodegen
+        run: |
+          brew install xcodegen || brew upgrade xcodegen
+          xcodegen version
+
+      # ── Generate project ────────────────────
+      - name: Generate Xcode project
+        run: xcodegen generate --spec project.yml
+
+      # ── Build ───────────────────────────────
+      - name: Build (Debug)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -configuration "$CONFIGURATION" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            2>&1 | tee /tmp/build.log
+
+      # ── Test ────────────────────────────────
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -configuration "$CONFIGURATION" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            -resultBundlePath TestResults.xcresult \
+            2>&1 | tee /tmp/test.log
+
+      # ── Artifacts ───────────────────────────
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.run_number }}
+          path: TestResults.xcresult
+          if-no-files-found: ignore
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ github.run_number }}
+          path: |
+            /tmp/build.log
+            /tmp/test.log
+
+  # ─────────────────────────────────────────────
+  # Job 2: SPM tests for GameTemplate logic layer
+  # Runs on Linux for speed (pure Swift, no UIKit)
+  # ─────────────────────────────────────────────
+  game-template:
+    name: GameTemplate – Swift Package Tests
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Resolve dependencies
+        run: swift package resolve
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test --parallel
