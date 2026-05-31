@@ -11,6 +11,12 @@ final class AppViewModel {
     var brightness: Float = 1.0
     var unitDuration: TimeInterval = 0.1
 
+    // MARK: Cipher state
+    var seedText = ""
+    var cipherError: String?
+
+    var isCipherEnabled: Bool { !seedText.trimmingCharacters(in: .whitespaces).isEmpty }
+
     // MARK: Transmission state
     var isTransmittingLight = false
     var isPlayingSound = false
@@ -42,7 +48,9 @@ final class AppViewModel {
     // MARK: Computed
 
     var morsePreview: String {
-        inputText.isEmpty ? "" : converter.morseString(for: inputText)
+        guard !inputText.isEmpty else { return "" }
+        if isCipherEnabled { return "[AES-256-GCM encrypted — \(inputText.count) chars]" }
+        return converter.morseString(for: inputText)
     }
 
     var canTransmitLight: Bool {
@@ -63,8 +71,13 @@ final class AppViewModel {
         return c
     }
 
-    private var signals: [MorseSignal] {
-        converter.signals(for: inputText)
+    /// Returns signals for transmission, encrypting the text first if a seed is set.
+    private func buildSignals() throws -> [MorseSignal] {
+        if isCipherEnabled {
+            let hex = try MorseCipher.encrypt(inputText, seed: seedText.trimmingCharacters(in: .whitespaces))
+            return converter.signals(for: hex)
+        }
+        return converter.signals(for: inputText)
     }
 
     // MARK: Setup
@@ -95,13 +108,16 @@ final class AppViewModel {
 
     func transmitViaLight() {
         guard canTransmitLight else { return }
+        cipherError = nil
+        let sigs: [MorseSignal]
+        do { sigs = try buildSignals() }
+        catch { cipherError = error.localizedDescription; return }
+
         lightTask?.cancel()
-        let sigs = signals
         let brt = brightness
         isTransmittingLight = true
         statusMessage = "Transmitting via light…"
 
-        // Turn off manual torch so Morse controls it
         if manualTorchOn {
             manualTorchOn = false
             flashlight.turnOff()
@@ -124,7 +140,11 @@ final class AppViewModel {
 
     func transmitViaSound() {
         guard canTransmitSound else { return }
-        let sigs = signals
+        cipherError = nil
+        let sigs: [MorseSignal]
+        do { sigs = try buildSignals() }
+        catch { cipherError = error.localizedDescription; return }
+
         isPlayingSound = true
         statusMessage = "Playing Morse audio…"
         Task {
@@ -142,7 +162,11 @@ final class AppViewModel {
 
     func prepareAudioShare() {
         guard !inputText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        let sigs = signals
+        cipherError = nil
+        let sigs: [MorseSignal]
+        do { sigs = try buildSignals() }
+        catch { cipherError = error.localizedDescription; return }
+
         Task {
             do {
                 let url = try await transmitter.exportAudio(signals: sigs)
@@ -164,13 +188,17 @@ final class AppViewModel {
         isDecoding = true
         decodedText = ""
         decodeError = nil
+        let seed = seedText.trimmingCharacters(in: .whitespaces)
         Task {
             defer {
                 url.stopAccessingSecurityScopedResource()
                 isDecoding = false
             }
             do {
-                let text = try await transmitter.decodeAudio(from: url)
+                var text = try await transmitter.decodeAudio(from: url)
+                if !seed.isEmpty && !text.isEmpty {
+                    text = (try? MorseCipher.decrypt(text, seed: seed)) ?? "[Decryption failed — wrong seed?]"
+                }
                 decodedText = text.isEmpty ? "(no Morse detected)" : text
             } catch {
                 decodeError = error.localizedDescription

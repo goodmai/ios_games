@@ -34,7 +34,9 @@ struct DocumentPicker: UIViewControllerRepresentable {
             guard let url = urls.first else { return }
             // Start security scope here; caller owns the stop call.
             _ = url.startAccessingSecurityScopedResource()
-            completion(url)
+            // Bounce to MainActor in case UIKit calls back on a background thread.
+            let cb = completion
+            Task { await MainActor.run { cb(url) } }
         }
 
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {}

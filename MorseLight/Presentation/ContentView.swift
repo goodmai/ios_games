@@ -10,6 +10,7 @@ struct ContentView: View {
             List {
                 flashlightSection
                 morseInputSection
+                cipherSection
                 transmissionSection
                 decodeSection
                 permissionsSection
@@ -109,6 +110,49 @@ struct ContentView: View {
             }
         } header: {
             Label("Message", systemImage: "text.cursor")
+        }
+    }
+
+    // MARK: - Cipher Section
+
+    private var cipherSection: some View {
+        Section {
+            HStack {
+                Image(systemName: vm.isCipherEnabled ? "lock.fill" : "lock.open")
+                    .foregroundStyle(vm.isCipherEnabled ? .indigo : .secondary)
+                    .frame(width: 24)
+                SecureField("Seed phrase (optional)", text: $vm.seedText)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                if vm.isCipherEnabled {
+                    Button {
+                        vm.seedText = ""
+                        vm.cipherError = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            }
+
+            if vm.isCipherEnabled {
+                Label("AES-256-GCM active — messages are encrypted before transmission and decrypted on import.",
+                      systemImage: "checkmark.shield.fill")
+                    .font(.caption)
+                    .foregroundStyle(.indigo)
+            }
+
+            if let err = vm.cipherError {
+                Label(err, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        } header: {
+            Label("Cipher", systemImage: "lock.shield")
+        } footer: {
+            Text("Both sender and receiver must use the same seed phrase. Leave empty to transmit unencrypted.")
+                .font(.caption)
         }
     }
 

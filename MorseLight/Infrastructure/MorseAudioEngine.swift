@@ -42,9 +42,8 @@ final class MorseAudioEngine: @unchecked Sendable {
         let samples = generateSamples(from: signals)
         guard !samples.isEmpty else { throw MorseAudioError.emptySamples }
 
-        let ts = Int(Date().timeIntervalSince1970)
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("morse_\(ts).m4a")
+            .appendingPathComponent("morse_\(UUID().uuidString).m4a")
 
         // Float32 PCM → AAC via AVAudioFile (auto-converts on write)
         let outputSettings: [String: Any] = [
