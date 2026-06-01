@@ -2,6 +2,8 @@ import Testing
 import Foundation
 @testable import GameTemplate
 
+typealias CGPoint = GameTemplate.CGPoint
+
 @Suite("Player Entity")
 struct PlayerTests {
 
