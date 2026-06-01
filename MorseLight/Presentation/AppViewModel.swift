@@ -21,6 +21,7 @@ final class AppViewModel {
     // MARK: Transmission state
     var isTransmittingLight = false
     var isPlayingSound = false
+    var isPlayingHaptics = false
     var statusMessage = ""
 
     // MARK: Share state
@@ -32,6 +33,9 @@ final class AppViewModel {
     var decodedText = ""
     var isDecoding = false
     var decodeError: String?
+    /// Sweeps 600–800 Hz and retunes Goertzel to the dominant tone (Epic E1),
+    /// so Doppler-shifted or off-tune third-party recordings still decode.
+    var autoTuneFrequency = false
 
     // MARK: Torch manual toggle
     var manualTorchOn = false
@@ -45,6 +49,10 @@ final class AppViewModel {
     private let flashlight = FlashlightController()
     private let transmitter = MorseTransmitter()
     private var lightTask: Task<Void, Never>?
+    private var hapticTask: Task<Void, Never>?
+    #if canImport(CoreHaptics)
+    private let hapticPlayer = MorseHapticPlayer()
+    #endif
 
     // MARK: Computed
 
@@ -62,6 +70,20 @@ final class AppViewModel {
 
     var canTransmitSound: Bool {
         !inputText.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    var isHapticsAvailable: Bool {
+        #if canImport(CoreHaptics)
+        return hapticPlayer.isSupported
+        #else
+        return false
+        #endif
+    }
+
+    var canTransmitHaptics: Bool {
+        isHapticsAvailable &&
+        !inputText.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !isPlayingHaptics
     }
 
     var isFlashlightAvailable: Bool { flashlight.isAvailable }
@@ -160,6 +182,35 @@ final class AppViewModel {
         }
     }
 
+    // MARK: Morse via haptics (Epic E5)
+
+    func transmitViaHaptics() {
+        guard canTransmitHaptics else { return }
+        cipherError = nil
+        let sigs: [MorseSignal]
+        do { sigs = try buildSignals() }
+        catch { cipherError = error.localizedDescription; return }
+
+        #if canImport(CoreHaptics)
+        do {
+            try hapticPlayer.play(signals: sigs)
+        } catch {
+            statusMessage = error.localizedDescription
+            return
+        }
+
+        isPlayingHaptics = true
+        statusMessage = "Playing haptics…"
+        let total = MorseHapticPattern().totalDuration(for: sigs)
+        hapticTask?.cancel()
+        hapticTask = Task {
+            try? await Task.sleep(for: .seconds(total))
+            isPlayingHaptics = false
+            statusMessage = ""
+        }
+        #endif
+    }
+
     // MARK: Share audio
 
     func prepareAudioShare() {
@@ -191,13 +242,14 @@ final class AppViewModel {
         decodedText = ""
         decodeError = nil
         let seed = seedText.trimmingCharacters(in: .whitespaces)
+        let autoTune = autoTuneFrequency
         Task {
             defer {
                 url.stopAccessingSecurityScopedResource()
                 isDecoding = false
             }
             do {
-                var text = try await transmitter.decodeAudio(from: url, language: selectedLanguage)
+                var text = try await transmitter.decodeAudio(from: url, language: selectedLanguage, autoTune: autoTune)
                 if !seed.isEmpty && !text.isEmpty {
                     text = (try? MorseCipher.decrypt(text, seed: seed)) ?? "[Decryption failed — wrong seed?]"
                 }
@@ -208,14 +260,48 @@ final class AppViewModel {
         }
     }
 
+    // MARK: Integration self-test hook (UI tests only)
+
+    /// Encodes "SOS" to an audio file and decodes it back through the live
+    /// pipeline, surfacing the result in `decodedText`. Drives Epics E1 (auto-tune)
+    /// and E2 (streaming decode) end-to-end for `MorseLightUITests` without a file
+    /// picker. Invoked only via the `-decodeSelfTest` launch argument.
+    func runDecodeSelfTest(message: String = "SOS") {
+        isDecoding = true
+        decodedText = ""
+        decodeError = nil
+        var c = MorseConverter()
+        c.unitDuration = 0.08
+        let signals = c.signals(for: message)
+        let autoTune = autoTuneFrequency
+        let language = selectedLanguage
+        Task {
+            do {
+                let url = try await transmitter.exportAudio(signals: signals)
+                defer { try? FileManager.default.removeItem(at: url) }
+                let text = try await transmitter.decodeAudio(from: url, language: language, autoTune: autoTune)
+                decodedText = text.isEmpty ? "(no Morse detected)" : text
+            } catch {
+                decodeError = error.localizedDescription
+            }
+            isDecoding = false
+        }
+    }
+
     // MARK: Stop
 
     func stop() {
         lightTask?.cancel()
         lightTask = nil
+        hapticTask?.cancel()
+        hapticTask = nil
         isTransmittingLight = false
         isPlayingSound = false
+        isPlayingHaptics = false
         statusMessage = ""
+        #if canImport(CoreHaptics)
+        hapticPlayer.stop()
+        #endif
         Task { await transmitter.stopAll() }
     }
 

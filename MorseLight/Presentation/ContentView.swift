@@ -19,7 +19,14 @@ struct ContentView: View {
             }
             .navigationTitle("MorseLight")
             .navigationBarTitleDisplayMode(.large)
-            .task { await vm.setup() }
+            .task {
+                await vm.setup()
+                let args = ProcessInfo.processInfo.arguments
+                if args.contains("-decodeSelfTest") {
+                    vm.autoTuneFrequency = args.contains("-autoTune")
+                    vm.runDecodeSelfTest()
+                }
+            }
             .sheet(isPresented: $vm.showShareSheet) {
                 if let url = vm.audioShareURL {
                     ActivityViewController(activityItems: [url])
@@ -134,6 +141,7 @@ struct ContentView: View {
                 .submitLabel(.done)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
+                .accessibilityIdentifier("messageField")
 
             // Live Morse preview
             if !vm.morsePreview.isEmpty {
@@ -142,6 +150,7 @@ struct ContentView: View {
                         .font(.system(.subheadline, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 2)
+                        .accessibilityIdentifier("morsePreview")
                 }
             }
         } header: {
@@ -226,6 +235,22 @@ struct ContentView: View {
             }
             .disabled(!vm.canTransmitSound)
 
+            // Via Haptics button (Epic E5)
+            Button {
+                vm.transmitViaHaptics()
+            } label: {
+                HStack {
+                    Label("Via Haptics", systemImage: "iphone.radiowaves.left.and.right")
+                        .foregroundStyle(vm.canTransmitHaptics ? .pink : .secondary)
+                    Spacer()
+                    if vm.isPlayingHaptics {
+                        ProgressView().tint(.pink)
+                    }
+                }
+            }
+            .accessibilityIdentifier("transmitHaptics")
+            .disabled(!vm.canTransmitHaptics)
+
             // Share audio button
             Button {
                 vm.prepareAudioShare()
@@ -236,7 +261,7 @@ struct ContentView: View {
             .disabled(vm.inputText.trimmingCharacters(in: .whitespaces).isEmpty)
 
             // Status / Stop
-            if vm.isTransmittingLight || vm.isPlayingSound {
+            if vm.isTransmittingLight || vm.isPlayingSound || vm.isPlayingHaptics {
                 HStack {
                     Image(systemName: "dot.radiowaves.left.and.right")
                         .symbolEffect(.variableColor)
@@ -260,6 +285,12 @@ struct ContentView: View {
 
     private var decodeSection: some View {
         Section {
+            Toggle(isOn: $vm.autoTuneFrequency) {
+                Label("Auto-tune (600–800 Hz)", systemImage: "tuningfork")
+                    .foregroundStyle(.teal)
+            }
+            .accessibilityIdentifier("autoTuneToggle")
+
             Button {
                 vm.importAndDecodeAudio()
             } label: {
@@ -273,6 +304,15 @@ struct ContentView: View {
                 }
             }
             .disabled(vm.isDecoding)
+
+            // Decode from a camera light source (Epic E3)
+            NavigationLink {
+                LightDecodeView(language: vm.selectedLanguage)
+            } label: {
+                Label("Decode Light (Camera)", systemImage: "camera.viewfinder")
+                    .foregroundStyle(.teal)
+            }
+            .accessibilityIdentifier("decodeLightLink")
 
             if let err = vm.decodeError {
                 Label(err, systemImage: "exclamationmark.triangle.fill")
@@ -288,6 +328,7 @@ struct ContentView: View {
                     Text(vm.decodedText)
                         .font(.body)
                         .textSelection(.enabled)
+                        .accessibilityIdentifier("decodedText")
 
                     HStack(spacing: 12) {
                         Button {
@@ -313,7 +354,7 @@ struct ContentView: View {
         } header: {
             Label("Decode Audio", systemImage: "waveform.badge.magnifyingglass")
         } footer: {
-            Text("Import an M4A/WAV audio file containing 700 Hz Morse code to decode it back to text.")
+            Text("Import an M4A/WAV audio file containing Morse code to decode it back to text. Enable auto-tune to lock onto Doppler-shifted or off-tune tones in the 600–800 Hz band.")
                 .font(.caption)
         }
     }

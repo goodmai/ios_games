@@ -22,7 +22,12 @@ struct MorseLightApp: App {
                     Color(.systemBackground)
                         .ignoresSafeArea()
                         .task {
-                            phase = pinManager.isSetup ? .locked : .setup
+                            // UI tests bypass the PIN gate to reach the main screen.
+                            if ProcessInfo.processInfo.arguments.contains("-uiTesting") {
+                                phase = .unlocked
+                            } else {
+                                phase = pinManager.isSetup ? .locked : .setup
+                            }
                         }
 
                 case .setup:

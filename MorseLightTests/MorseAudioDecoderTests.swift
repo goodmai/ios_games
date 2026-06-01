@@ -114,4 +114,44 @@ struct MorseAudioDecoderTests {
         let decoder = MorseAudioDecoder()
         #expect(decoder.energyThreshold == 0.008)
     }
+
+    // MARK: - E1: Doppler-resilient auto-tune (FTL-05)
+
+    @Test("Decoder: autoTuneFrequency defaults to false")
+    func defaultAutoTune() {
+        #expect(MorseAudioDecoder().autoTuneFrequency == false)
+    }
+
+    @Test("Auto-tune enabled still round-trips a nominal 700 Hz file")
+    func autoTuneRoundTrip() throws {
+        var converter = MorseConverter()
+        converter.unitDuration = 0.08
+        let signals = converter.signals(for: "SOS")
+        let url = try MorseAudioEngine().exportM4A(signals: signals)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        var decoder = MorseAudioDecoder()
+        decoder.autoTuneFrequency = true
+        #expect(try decoder.decode(from: url) == "SOS")
+    }
+
+    // MARK: - E2: Streaming reads (MEM-01, MEM-02)
+
+    @Test("Decoder: streamingChunkFrames defaults to 4096")
+    func defaultChunkFrames() {
+        #expect(MorseAudioDecoder().streamingChunkFrames == 4096)
+    }
+
+    @Test("Small chunk size still decodes SOS (chunk-boundary equivalence)")
+    func smallChunkRoundTrip() throws {
+        var converter = MorseConverter()
+        converter.unitDuration = 0.08
+        let signals = converter.signals(for: "SOS")
+        let url = try MorseAudioEngine().exportM4A(signals: signals)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        var decoder = MorseAudioDecoder()
+        decoder.streamingChunkFrames = 1024
+        #expect(try decoder.decode(from: url) == "SOS")
+    }
 }

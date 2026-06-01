@@ -15,15 +15,16 @@ enum MorseDecoderError: Error, LocalizedError {
     }
 }
 
-/// Decodes a 700 Hz Morse-code audio file back to plain text.
+/// Decodes a Morse-code audio file back to plain text.
 ///
 /// Algorithm:
-///  1. Read audio file (any format AVFoundation supports: M4A, WAV, MP3…)
+///  1. Stream the audio file in fixed chunks (memory bounded by `streamingChunkFrames`)
 ///  2. Mix channels to mono Float32
-///  3. Slide 10 ms windows; run Goertzel algorithm to measure 700 Hz energy
-///  4. Threshold → on/off segment list with durations
-///  5. K-means (k=2) calibrates unit duration from dot/dash clusters
-///  6. Map segments to dots/dashes/gaps → look up Morse table → text
+///  3. Optionally sweep 600–800 Hz (`autoTuneFrequency`) to track Doppler / off-tune
+///     transmitters before detection
+///  4. Slide windows; run Goertzel at the (tuned) tone to measure energy
+///  5. Threshold → on/off `MorseSegment` list
+///  6. `MorseSegmentDecoder`: K-means unit calibration → text
 struct MorseAudioDecoder: Sendable {
 
     var toneFrequency: Double = 700.0
@@ -33,6 +34,15 @@ struct MorseAudioDecoder: Sendable {
 
     // Minimum segment to keep (shorter = noise)
     var minSegmentDuration: TimeInterval = 0.020
+
+    /// When true, the dominant tone in 600–800 Hz is detected per-file and used
+    /// in place of `toneFrequency`, so motion-induced Doppler or a third-party
+    /// transmitter's frequency drift still decodes.
+    var autoTuneFrequency: Bool = false
+
+    /// Frames read per streaming pass. Peak PCM-buffer memory is bounded by this,
+    /// not by the file length.
+    var streamingChunkFrames: AVAudioFrameCount = 4096
 
     // MARK: Public entry point
 
@@ -56,17 +66,48 @@ struct MorseAudioDecoder: Sendable {
             interleaved: false
         )!
 
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: pcmFormat, frameCapacity: maxFrames) else {
-            throw MorseDecoderError.bufferAllocationFailed
-        }
-        try audioFile.read(into: buffer)
+        let mono = try readMono(from: audioFile, format: pcmFormat, maxFrames: maxFrames)
 
-        let mono = mixToMono(buffer: buffer)
-        let segments = detectSegments(samples: mono, sampleRate: sampleRate)
-        return segmentsToText(segments)
+        var frequency = toneFrequency
+        if autoTuneFrequency,
+           let peak = FrequencyPeakDetector().dominantFrequency(samples: mono, sampleRate: sampleRate) {
+            frequency = peak
+        }
+
+        let segments = detectSegments(samples: mono, sampleRate: sampleRate, frequency: frequency)
+        var decoder = MorseSegmentDecoder()
+        decoder.language = language
+        return decoder.text(from: segments)
     }
 
-    // MARK: Step 1 — Mono mix
+    // MARK: Step 1 — Stream file in chunks → mono Float32
+
+    private func readMono(
+        from audioFile: AVAudioFile,
+        format pcmFormat: AVAudioFormat,
+        maxFrames: AVAudioFrameCount
+    ) throws -> [Float] {
+        let chunkFrames = max(1, streamingChunkFrames)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: pcmFormat, frameCapacity: chunkFrames) else {
+            throw MorseDecoderError.bufferAllocationFailed
+        }
+
+        var mono: [Float] = []
+        mono.reserveCapacity(Int(maxFrames))
+
+        var remaining = maxFrames
+        while remaining > 0 {
+            let toRead = min(chunkFrames, remaining)
+            buffer.frameLength = 0
+            do { try audioFile.read(into: buffer, frameCount: toRead) }
+            catch { throw MorseDecoderError.cannotReadFile(error.localizedDescription) }
+
+            if buffer.frameLength == 0 { break } // end of file
+            mono.append(contentsOf: mixToMono(buffer: buffer))
+            remaining -= min(buffer.frameLength, remaining)
+        }
+        return mono
+    }
 
     private func mixToMono(buffer: AVAudioPCMBuffer) -> [Float] {
         guard let channelData = buffer.floatChannelData else { return [] }
@@ -89,10 +130,11 @@ struct MorseAudioDecoder: Sendable {
 
     private func detectSegments(
         samples: [Float],
-        sampleRate: Double
-    ) -> [(isOn: Bool, duration: TimeInterval)] {
+        sampleRate: Double,
+        frequency: Double
+    ) -> [MorseSegment] {
         let winSize = max(64, Int(sampleRate * windowDuration))
-        var segments: [(isOn: Bool, duration: TimeInterval)] = []
+        var segments: [MorseSegment] = []
 
         var currentIsOn = false
         var segmentFrames = 0
@@ -100,13 +142,13 @@ struct MorseAudioDecoder: Sendable {
         var i = 0
         while i + winSize <= samples.count {
             let windowSlice = samples[i ..< i + winSize]
-            let power = goertzel(slice: windowSlice, freq: toneFrequency, sampleRate: sampleRate)
+            let power = Goertzel.power(windowSlice, freq: frequency, sampleRate: sampleRate)
             let winIsOn = power > energyThreshold
 
             if winIsOn != currentIsOn {
                 let dur = Double(segmentFrames) / sampleRate
                 if segmentFrames > 0 && dur >= minSegmentDuration {
-                    segments.append((isOn: currentIsOn, duration: dur))
+                    segments.append(MorseSegment(isOn: currentIsOn, duration: dur))
                 }
                 currentIsOn = winIsOn
                 segmentFrames = winSize
@@ -119,91 +161,9 @@ struct MorseAudioDecoder: Sendable {
         // Last segment
         let dur = Double(segmentFrames) / sampleRate
         if segmentFrames > 0 && dur >= minSegmentDuration {
-            segments.append((isOn: currentIsOn, duration: dur))
+            segments.append(MorseSegment(isOn: currentIsOn, duration: dur))
         }
         return segments
     }
-
-    // MARK: Step 3 — Goertzel at single frequency (normalized)
-
-    private func goertzel(slice: ArraySlice<Float>, freq: Double, sampleRate: Double) -> Float {
-        let n = slice.count
-        let k = (Double(n) * freq / sampleRate).rounded()
-        let coeff = Float(2.0 * cos(2.0 * .pi * k / Double(n)))
-        var s1: Float = 0, s2: Float = 0
-        for x in slice {
-            let s0 = x + coeff * s1 - s2
-            s2 = s1; s1 = s0
-        }
-        // Normalize by N² so threshold is amplitude-independent
-        let power = s1 * s1 + s2 * s2 - coeff * s1 * s2
-        return power / Float(n * n)
-    }
-
-    // MARK: Step 4 — Calibrate unit duration via K-means (k=2)
-
-    private func estimateUnit(from onDurations: [TimeInterval]) -> TimeInterval {
-        guard !onDurations.isEmpty else { return 0.1 }
-        guard onDurations.count > 1 else { return onDurations[0] }
-
-        let sorted = onDurations.sorted()
-
-        // K-means: two centroids = dot & dash
-        var c1 = sorted.first!
-        var c2 = sorted.last!
-
-        for _ in 0..<20 {
-            let mid = (c1 + c2) / 2.0
-            let dots = sorted.filter { $0 <= mid }
-            let dashes = sorted.filter { $0 > mid }
-            if dots.isEmpty || dashes.isEmpty { break }
-            let newC1 = dots.reduce(0, +) / Double(dots.count)
-            let newC2 = dashes.reduce(0, +) / Double(dashes.count)
-            if abs(newC1 - c1) < 0.001 && abs(newC2 - c2) < 0.001 { break }
-            c1 = newC1; c2 = newC2
-        }
-        return c1   // dot cluster mean = 1 unit
-    }
-
-    // MARK: Step 5 — Segments → text
-
-    private func segmentsToText(_ segments: [(isOn: Bool, duration: TimeInterval)]) -> String {
-        let onDurations = segments.filter { $0.isOn }.map { $0.duration }
-        guard !onDurations.isEmpty else { return "" }
-
-        let unit = estimateUnit(from: onDurations)
-        guard unit > 0 else { return "" }
-
-        // Reverse lookup: Morse code string → Character (language-aware)
-        var table: [String: Character] = [:]
-        for (ch, code) in MorseCode.table(for: language) where ch != " " { table[code] = ch }
-
-        var result = ""
-        var currentCode = ""
-
-        for seg in segments {
-            if seg.isOn {
-                // dot threshold = 2× unit (dot ≈ 1u, dash ≈ 3u)
-                currentCode += seg.duration < unit * 2.0 ? "." : "-"
-            } else {
-                if seg.duration > unit * 5.0 {
-                    // Word gap (7u): flush letter + space
-                    if let ch = table[currentCode] { result.append(ch) }
-                    currentCode = ""
-                    if !result.hasSuffix(" ") { result += " " }
-                } else if seg.duration > unit * 2.0 {
-                    // Letter gap (3u): flush letter
-                    if let ch = table[currentCode] { result.append(ch) }
-                    currentCode = ""
-                }
-                // else intra-character gap (1u): keep building currentCode
-            }
-        }
-
-        if !currentCode.isEmpty, let ch = table[currentCode] {
-            result.append(ch)
-        }
-
-        return result.trimmingCharacters(in: .whitespaces)
-    }
 }
+</content>
