@@ -36,6 +36,33 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         # iPhone only
         TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - target: MorseLightWidget
+        embed: true
+
+  # Control Center widget extension (Epic E4 — iOS 18).
+  # Shares the torch + encoder sources with the app target.
+  MorseLightWidget:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: MorseLightWidget
+      - path: MorseLight/Domain/MorseCode.swift
+      - path: MorseLight/Domain/MorseConverter.swift
+      - path: MorseLight/Infrastructure/FlashlightController.swift
+    info:
+      path: MorseLightWidget/Info.plist
+      properties:
+        CFBundleDisplayName: MorseLight
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.goodmai.MorseLight.widget
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_KEY_NSCameraUsageDescription: "Required to control the flashlight for the SOS control"
 
   MorseLightTests:
     type: bundle.unit-test

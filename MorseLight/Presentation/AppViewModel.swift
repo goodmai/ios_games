@@ -21,6 +21,7 @@ final class AppViewModel {
     // MARK: Transmission state
     var isTransmittingLight = false
     var isPlayingSound = false
+    var isPlayingHaptics = false
     var statusMessage = ""
 
     // MARK: Share state
@@ -48,6 +49,10 @@ final class AppViewModel {
     private let flashlight = FlashlightController()
     private let transmitter = MorseTransmitter()
     private var lightTask: Task<Void, Never>?
+    private var hapticTask: Task<Void, Never>?
+    #if canImport(CoreHaptics)
+    private let hapticPlayer = MorseHapticPlayer()
+    #endif
 
     // MARK: Computed
 
@@ -65,6 +70,20 @@ final class AppViewModel {
 
     var canTransmitSound: Bool {
         !inputText.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    var isHapticsAvailable: Bool {
+        #if canImport(CoreHaptics)
+        return hapticPlayer.isSupported
+        #else
+        return false
+        #endif
+    }
+
+    var canTransmitHaptics: Bool {
+        isHapticsAvailable &&
+        !inputText.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !isPlayingHaptics
     }
 
     var isFlashlightAvailable: Bool { flashlight.isAvailable }
@@ -163,6 +182,35 @@ final class AppViewModel {
         }
     }
 
+    // MARK: Morse via haptics (Epic E5)
+
+    func transmitViaHaptics() {
+        guard canTransmitHaptics else { return }
+        cipherError = nil
+        let sigs: [MorseSignal]
+        do { sigs = try buildSignals() }
+        catch { cipherError = error.localizedDescription; return }
+
+        #if canImport(CoreHaptics)
+        do {
+            try hapticPlayer.play(signals: sigs)
+        } catch {
+            statusMessage = error.localizedDescription
+            return
+        }
+
+        isPlayingHaptics = true
+        statusMessage = "Playing haptics…"
+        let total = MorseHapticPattern().totalDuration(for: sigs)
+        hapticTask?.cancel()
+        hapticTask = Task {
+            try? await Task.sleep(for: .seconds(total))
+            isPlayingHaptics = false
+            statusMessage = ""
+        }
+        #endif
+    }
+
     // MARK: Share audio
 
     func prepareAudioShare() {
@@ -245,9 +293,15 @@ final class AppViewModel {
     func stop() {
         lightTask?.cancel()
         lightTask = nil
+        hapticTask?.cancel()
+        hapticTask = nil
         isTransmittingLight = false
         isPlayingSound = false
+        isPlayingHaptics = false
         statusMessage = ""
+        #if canImport(CoreHaptics)
+        hapticPlayer.stop()
+        #endif
         Task { await transmitter.stopAll() }
     }
 

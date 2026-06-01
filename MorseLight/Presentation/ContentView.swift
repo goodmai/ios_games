@@ -235,6 +235,22 @@ struct ContentView: View {
             }
             .disabled(!vm.canTransmitSound)
 
+            // Via Haptics button (Epic E5)
+            Button {
+                vm.transmitViaHaptics()
+            } label: {
+                HStack {
+                    Label("Via Haptics", systemImage: "iphone.radiowaves.left.and.right")
+                        .foregroundStyle(vm.canTransmitHaptics ? .pink : .secondary)
+                    Spacer()
+                    if vm.isPlayingHaptics {
+                        ProgressView().tint(.pink)
+                    }
+                }
+            }
+            .accessibilityIdentifier("transmitHaptics")
+            .disabled(!vm.canTransmitHaptics)
+
             // Share audio button
             Button {
                 vm.prepareAudioShare()
@@ -245,7 +261,7 @@ struct ContentView: View {
             .disabled(vm.inputText.trimmingCharacters(in: .whitespaces).isEmpty)
 
             // Status / Stop
-            if vm.isTransmittingLight || vm.isPlayingSound {
+            if vm.isTransmittingLight || vm.isPlayingSound || vm.isPlayingHaptics {
                 HStack {
                     Image(systemName: "dot.radiowaves.left.and.right")
                         .symbolEffect(.variableColor)
@@ -288,6 +304,15 @@ struct ContentView: View {
                 }
             }
             .disabled(vm.isDecoding)
+
+            // Decode from a camera light source (Epic E3)
+            NavigationLink {
+                LightDecodeView(language: vm.selectedLanguage)
+            } label: {
+                Label("Decode Light (Camera)", systemImage: "camera.viewfinder")
+                    .foregroundStyle(.teal)
+            }
+            .accessibilityIdentifier("decodeLightLink")
 
             if let err = vm.decodeError {
                 Label(err, systemImage: "exclamationmark.triangle.fill")
