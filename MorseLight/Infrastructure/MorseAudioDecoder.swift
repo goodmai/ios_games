@@ -29,6 +29,7 @@ struct MorseAudioDecoder: Sendable {
     var toneFrequency: Double = 700.0
     var windowDuration: TimeInterval = 0.010   // 10 ms analysis window
     var energyThreshold: Float = 0.008          // normalized Goertzel power
+    var language: MorseLanguage = .english
 
     // Minimum segment to keep (shorter = noise)
     var minSegmentDuration: TimeInterval = 0.020
@@ -173,9 +174,9 @@ struct MorseAudioDecoder: Sendable {
         let unit = estimateUnit(from: onDurations)
         guard unit > 0 else { return "" }
 
-        // Reverse lookup: Morse code string → Character
+        // Reverse lookup: Morse code string → Character (language-aware)
         var table: [String: Character] = [:]
-        for (ch, code) in MorseCode.table where ch != " " { table[code] = ch }
+        for (ch, code) in MorseCode.table(for: language) where ch != " " { table[code] = ch }
 
         var result = ""
         var currentCode = ""

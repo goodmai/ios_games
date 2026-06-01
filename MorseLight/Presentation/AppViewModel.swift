@@ -10,6 +10,7 @@ final class AppViewModel {
     var inputText = ""
     var brightness: Float = 1.0
     var unitDuration: TimeInterval = 0.1
+    var selectedLanguage: MorseLanguage = .english
 
     // MARK: Cipher state
     var seedText = ""
@@ -68,6 +69,7 @@ final class AppViewModel {
     private var converter: MorseConverter {
         var c = MorseConverter()
         c.unitDuration = unitDuration
+        c.language = selectedLanguage
         return c
     }
 
@@ -195,7 +197,7 @@ final class AppViewModel {
                 isDecoding = false
             }
             do {
-                var text = try await transmitter.decodeAudio(from: url)
+                var text = try await transmitter.decodeAudio(from: url, language: selectedLanguage)
                 if !seed.isEmpty && !text.isEmpty {
                     text = (try? MorseCipher.decrypt(text, seed: seed)) ?? "[Decryption failed — wrong seed?]"
                 }

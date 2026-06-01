@@ -4,11 +4,13 @@ import Photos
 
 struct ContentView: View {
     @State private var vm = AppViewModel()
+    @State private var showMorseTable = false
 
     var body: some View {
         NavigationStack {
             List {
                 flashlightSection
+                languageSection
                 morseInputSection
                 cipherSection
                 transmissionSection
@@ -30,6 +32,40 @@ struct ContentView: View {
                     vm.decodeAudio(from: url)
                 }
             }
+            .sheet(isPresented: $showMorseTable) {
+                MorseTableSheet(language: vm.selectedLanguage)
+            }
+        }
+    }
+
+    // MARK: - Language Section
+
+    private var languageSection: some View {
+        Section {
+            Picker("Language", selection: $vm.selectedLanguage) {
+                ForEach(MorseLanguage.allCases, id: \.self) { lang in
+                    Text("\(lang.flagEmoji) \(lang.rawValue)").tag(lang)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Button {
+                showMorseTable = true
+            } label: {
+                HStack {
+                    Label("Morse Alphabet Table", systemImage: "list.bullet.rectangle")
+                        .foregroundStyle(.teal)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Label("Language", systemImage: "globe")
+        } footer: {
+            Text("Select the Morse alphabet used for encoding and decoding.")
+                .font(.caption)
         }
     }
 
@@ -368,6 +404,50 @@ private struct PermissionRow: View {
                     .font(.subheadline)
             }
         }
+    }
+}
+
+// MARK: - Morse Table Sheet
+
+private struct MorseTableSheet: View {
+    let language: MorseLanguage
+
+    private var entries: [(Character, String)] {
+        let codeTable = MorseCode.table(for: language)
+        return codeTable
+            .filter { $0.key != " " && !$0.value.isEmpty }
+            .sorted { lhs, rhs in
+                // Letters first, then digits, then punctuation
+                let lStr = String(lhs.key)
+                let rStr = String(rhs.key)
+                return lStr < rStr
+            }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List(entries, id: \.0) { char, code in
+                HStack {
+                    Text(String(char))
+                        .font(.system(.body, design: .monospaced))
+                        .frame(width: 36, alignment: .leading)
+                        .foregroundStyle(.primary)
+                    Text(code)
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(morseSymbols(code))
+                        .font(.caption)
+                        .foregroundStyle(.teal)
+                }
+            }
+            .navigationTitle("\(language.flagEmoji) \(language.rawValue) Morse")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private func morseSymbols(_ code: String) -> String {
+        code.map { $0 == "." ? "·" : "—" }.joined()
     }
 }
 

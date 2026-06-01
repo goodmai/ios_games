@@ -2,15 +2,17 @@ import Foundation
 
 struct MorseConverter: Sendable {
     var unitDuration: TimeInterval = 0.1
+    var language: MorseLanguage = .english
 
     // Human-readable: "... --- ..." with "/" between words
     func morseString(for text: String) -> String {
+        let codeTable = MorseCode.table(for: language)
         let upper = text.uppercased()
         var parts: [String] = []
         for char in upper {
             if char == " " {
                 parts.append("/")
-            } else if let code = MorseCode.table[char] {
+            } else if let code = codeTable[char] {
                 parts.append(code)
             }
         }
@@ -19,12 +21,13 @@ struct MorseConverter: Sendable {
 
     // Sequence of on/off signals for transmission
     func signals(for text: String) -> [MorseSignal] {
+        let codeTable = MorseCode.table(for: language)
         var result: [MorseSignal] = []
         let words = text.uppercased()
             .split(separator: " ", omittingEmptySubsequences: true)
 
         for (wordIdx, word) in words.enumerated() {
-            let letters = word.compactMap { MorseCode.table[$0] }
+            let letters = word.compactMap { codeTable[$0] }
 
             for (letterIdx, code) in letters.enumerated() {
                 let elems = Array(code)
