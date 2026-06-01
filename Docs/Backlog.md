@@ -68,6 +68,18 @@
 
 ---
 
+## Sprint 5 — Optimization & Robustness (Epic E6)
+
+> RTM block 16. Growth points from review.
+
+- [x] **[E6.1]** `KMeans1D` with epsilon convergence threshold (`OPT-01,02`)
+- [x] **[E6.2]** `MorseSegmentDecoder` adopts `KMeans1D` (`OPT-03`)
+- [x] **[E6.3]** `TorchSchedule` absolute-offset timeline (`OPT-04`)
+- [x] **[E6.4]** `TorchMorseTransmitter` on `ContinuousClock` deadlines (`OPT-05` — device)
+- [x] **[E6.5]** `SendSOSIntent.openAppWhenRun` watchdog-safe transmission (`OPT-06` — device)
+
+---
+
 ## Backlog (Future Sprints)
 
 - [ ] Live camera preview overlay with decoded text (E3 UI)

@@ -243,6 +243,19 @@
 
 ---
 
+## 16. Optimization & Robustness (Epic E6 — Growth Points)
+
+| Req ID | Feature | Requirement | Unit Tests | Manual Tests | Integration Tests | Status |
+|--------|---------|-------------|-----------|-------------|-------------------|--------|
+| OPT-01 | K-means | `KMeans1D` separates dot/dash clusters; stops on `Δμ < epsilon` (default 0.0005) | `KMeans1D / Separates dot and dash clusters around their means` `/ Converges before the iteration cap on well-separated data` `/ Default epsilon is 0.0005` | – | – | ✅ |
+| OPT-02 | K-means | Convergence threshold + iteration cap are configurable | `KMeans1D / Larger epsilon never needs more iterations than a tiny epsilon` `/ maxIterations caps the loop` `/ Single value collapses to one cluster with zero iterations` `/ Empty input returns nil` | – | – | ✅ |
+| OPT-03 | K-means | `MorseSegmentDecoder` uses `KMeans1D` without changing decode output | `MorseSegmentDecoder / Decodes SOS from ideal segments` `/ Decodes HI from ideal segments` `/ Russian language decodes Cyrillic from ideal segments` | – | – | ✅ |
+| OPT-04 | Timing | `TorchSchedule` builds an absolute-offset, strictly increasing flash timeline | `TorchSchedule / One step per signal` `/ First step starts at offset zero` `/ Offsets are strictly increasing (absolute timeline)` `/ On/off flags alternate with the signal stream` `/ Final offset is below the total duration` `/ Empty input yields no steps` | – | – | ✅ |
+| OPT-05 | Timing | `TorchMorseTransmitter` plays the schedule on `ContinuousClock` absolute deadlines (drift-free) | – | Transmit a long message → torch timing stays locked to the start, no cumulative drift | – | 🔲 (device) |
+| OPT-06 | Watchdog | `SendSOSIntent.openAppWhenRun = true` runs transmission in the foreground app, avoiding the control extension's CPU/Watchdog limit | – | iOS 18 → tap Morse SOS control → app opens and torch blinks the full SOS without termination | – | 🔲 (device) |
+
+---
+
 ## Test File Index
 
 | File | Suite(s) | Test count |
@@ -256,7 +269,9 @@
 | `MorseLightTests/MorseSegmentDecoderTests.swift` | `MorseSegmentDecoder` | 5 |
 | `MorseLightTests/MorseHapticPatternTests.swift` | `MorseHapticPattern` | 8 |
 | `MorseLightTests/LightSignalDecoderTests.swift` | `LightSignalDecoder` | 6 |
-| **Total** | | **127** |
+| `MorseLightTests/KMeans1DTests.swift` | `KMeans1D` | 7 |
+| `MorseLightTests/TorchScheduleTests.swift` | `TorchSchedule` | 6 |
+| **Total** | | **140** |
 
 ---
 

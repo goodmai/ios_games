@@ -121,6 +121,28 @@ through `CHHapticEngine`.
 
 ---
 
+## E6 — Optimization & Robustness (Growth Points)
+
+Math/system hardening of shipped epics.
+
+### Stories
+- **E6.1** Extract `KMeans1D` with a configurable convergence threshold; calibration
+  stops on `Δμ < epsilon` instead of a fixed 20-iteration loop → `OPT-01,02`
+- **E6.2** `MorseSegmentDecoder` uses `KMeans1D` (behavior-preserving) → `OPT-03`
+- **E6.3** `TorchSchedule` builds an absolute-offset flash timeline (drift-free vs
+  cumulative sleeps) → `OPT-04`
+- **E6.4** `TorchMorseTransmitter` plays the schedule on `ContinuousClock` absolute
+  deadlines → `OPT-05`
+- **E6.5** `SendSOSIntent.openAppWhenRun = true` moves transmission to the foreground
+  app, dodging the Control Center extension's CPU/Watchdog limit → `OPT-06` (device)
+
+**Files:** `Domain/KMeans1D.swift`, `Domain/TorchSchedule.swift`,
+`Infrastructure/TorchMorseTransmitter.swift`, `MorseSegmentDecoder.swift`,
+`MorseLightWidget/MorseControlWidget.swift`
+· Tests: `KMeans1DTests.swift`, `TorchScheduleTests.swift`
+
+---
+
 ## Sprint Mapping
 
 | Sprint | Epics | TDD deliverables |
@@ -128,6 +150,7 @@ through `CHHapticEngine`.
 | **2** | E1, E2, E5 | `Goertzel`, `FrequencyPeakDetector`, streaming decode, `MorseHapticPattern` + suites |
 | **3** | E3 | `MorseSegmentDecoder` extraction, `LightSignalDecoder` + suite, Vision scaffold |
 | **4** | E4 | Control Center widget + Phase-4 transmitter wiring (Xcode integration) |
+| **5** | E6 | `KMeans1D` epsilon convergence, `TorchSchedule`/`TorchMorseTransmitter`, watchdog-safe SOS intent |
 
 ## Definition of Done (per story)
 1. Failing test committed first (`test: …`).
