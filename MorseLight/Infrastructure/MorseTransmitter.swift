@@ -45,9 +45,10 @@ actor MorseTransmitter {
     // MARK: Decode — audio file → Morse → text
     // Runs on background thread; actor isolation ensures thread safety.
 
-    func decodeAudio(from url: URL, language: MorseLanguage = .english) async throws -> String {
+    func decodeAudio(from url: URL, language: MorseLanguage = .english, autoTune: Bool = false) async throws -> String {
         var dec = decoder
         dec.language = language
+        dec.autoTuneFrequency = autoTune
         return try await Task.detached(priority: .userInitiated) {
             try dec.decode(from: url)
         }.value

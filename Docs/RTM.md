@@ -192,7 +192,8 @@
 | FTL-02 | Auto-tune | Detector finds Doppler-shifted / off-tune tones (620 Hz, 760 Hz) inside 600–800 Hz | `FrequencyPeakDetector / Detects a Doppler-shifted 760 Hz tone` `/ Detects a low-edge 620 Hz tone` | Walk toward/away from a 700 Hz transmitter → message still decodes | – | ✅ |
 | FTL-03 | Auto-tune | Silence / empty input returns `nil` (no false tone below noise floor) | `FrequencyPeakDetector / Returns nil for pure silence` `/ Returns nil for empty input` | – | – | ✅ |
 | FTL-04 | Auto-tune | Default search band is 600–800 Hz | `FrequencyPeakDetector / Default band is 600–800 Hz` | – | – | ✅ |
-| FTL-05 | Auto-tune | `MorseAudioDecoder.autoTuneFrequency` retunes detection to the band peak (default off) | `MorseAudioDecoder / Decoder: autoTuneFrequency defaults to false` `/ Auto-tune enabled still round-trips a nominal 700 Hz file` | Import a third-party Morse clip with drifted tone → decodes with auto-tune on | – | ✅ |
+| FTL-05 | Auto-tune | `MorseAudioDecoder.autoTuneFrequency` retunes detection to the band peak (default off) | `MorseAudioDecoder / Decoder: autoTuneFrequency defaults to false` `/ Auto-tune enabled still round-trips a nominal 700 Hz file` | Import a third-party Morse clip with drifted tone → decodes with auto-tune on | `MorseLightUITests / testDecodeSelfTestWithAutoTuneRoundTripsSOS` | ✅ |
+| FTL-07 | Auto-tune UI | Decode section exposes an "Auto-tune (600–800 Hz)" toggle wired to the decode pipeline | – | Toggle Auto-tune in Decode section → state flips | `MorseLightUITests / testAutoTuneToggleExistsAndToggles` | ✅ |
 | FTL-06 | Auto-tune | Shared `Goertzel.power` used by both decoder and detector (no duplicated DSP) | Covered transitively by `MorseAudioDecoder` + `FrequencyPeakDetector` suites | – | – | ✅ |
 
 ---
@@ -202,7 +203,7 @@
 | Req ID | Feature | Requirement | Unit Tests | Manual Tests | Integration Tests | Status |
 |--------|---------|-------------|-----------|-------------|-------------------|--------|
 | MEM-01 | Streaming | `MorseAudioDecoder` reads in 4096-frame chunks; `streamingChunkFrames` default is 4096 | `MorseAudioDecoder / Decoder: streamingChunkFrames defaults to 4096` | Decode a multi-minute file → peak memory stays bounded (Instruments Allocations) | – | ✅ |
-| MEM-02 | Streaming | Chunked path is behavior-equivalent across chunk boundaries | `MorseAudioDecoder / Small chunk size still decodes SOS (chunk-boundary equivalence)` `/ Round-trip SOS` `/ Round-trip HI` | – | Existing round-trip suite passes unchanged | ✅ |
+| MEM-02 | Streaming | Chunked path is behavior-equivalent across chunk boundaries | `MorseAudioDecoder / Small chunk size still decodes SOS (chunk-boundary equivalence)` `/ Round-trip SOS` `/ Round-trip HI` | – | `MorseLightUITests / testDecodeSelfTestRoundTripsSOS` | ✅ |
 
 ---
 
@@ -310,3 +311,10 @@
 | INT-04 | Spanish round-trip: Ñ → M4A → Ñ | `MorseCodeLanguageTests / Round-trip Spanish Ñ via audio` | ✅ |
 | INT-05 | Cipher + decode: encrypt → signals → M4A → decode → decrypt | Manual MT-05 | ✅ |
 | INT-06 | PIN persistence: setup → re-init → isSetup=true | `PINManagerTests / isSetup reflects Keychain state on re-init` | ✅ |
+| INT-07 | UI: app shell reachable, message → live Morse preview | `MorseLightUITests / testTypingMessageUpdatesMorsePreview` | ✅ |
+| INT-08 | UI: E1+E2 decode round-trip "SOS" through the live pipeline | `MorseLightUITests / testDecodeSelfTestRoundTripsSOS` | ✅ |
+| INT-09 | UI: E1 auto-tune decode round-trip "SOS" | `MorseLightUITests / testDecodeSelfTestWithAutoTuneRoundTripsSOS` | ✅ |
+
+> **CI policy:** unit tests run locally on Mac (`Cmd+U`); CI builds the app and runs
+> the `MorseLightUITests` integration target on a simulator (see
+> `.github/workflows/ios-build.yml`).
