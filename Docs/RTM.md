@@ -1,8 +1,8 @@
 # Requirements Traceability Matrix (RTM)
 
 **Project:** MorseLight — iOS Morse Code Transmitter / Receiver  
-**Branch:** `claude/swift-tdd-game-template-FzsSz`  
-**Last updated:** 2026-06-01
+**Branch:** `claude/inspiring-mendel-9pvNL`  
+**Last updated:** 2026-06-01 (added Epics E1–E5: FTL, MEM, CV, CTL, HAP — see `Docs/PLAN.md`)
 
 ---
 
@@ -184,16 +184,76 @@
 
 ---
 
+## 11. Algorithmic Fault Tolerance — Doppler / Off-Frequency Auto-Tune (Epic E1)
+
+| Req ID | Feature | Requirement | Unit Tests | Manual Tests | Integration Tests | Status |
+|--------|---------|-------------|-----------|-------------|-------------------|--------|
+| FTL-01 | Auto-tune | `FrequencyPeakDetector.dominantFrequency` returns the nominal 700 Hz tone within band | `FrequencyPeakDetector / Detects the nominal 700 Hz tone within the band` | – | – | ✅ |
+| FTL-02 | Auto-tune | Detector finds Doppler-shifted / off-tune tones (620 Hz, 760 Hz) inside 600–800 Hz | `FrequencyPeakDetector / Detects a Doppler-shifted 760 Hz tone` `/ Detects a low-edge 620 Hz tone` | Walk toward/away from a 700 Hz transmitter → message still decodes | – | ✅ |
+| FTL-03 | Auto-tune | Silence / empty input returns `nil` (no false tone below noise floor) | `FrequencyPeakDetector / Returns nil for pure silence` `/ Returns nil for empty input` | – | – | ✅ |
+| FTL-04 | Auto-tune | Default search band is 600–800 Hz | `FrequencyPeakDetector / Default band is 600–800 Hz` | – | – | ✅ |
+| FTL-05 | Auto-tune | `MorseAudioDecoder.autoTuneFrequency` retunes detection to the band peak (default off) | `MorseAudioDecoder / Decoder: autoTuneFrequency defaults to false` `/ Auto-tune enabled still round-trips a nominal 700 Hz file` | Import a third-party Morse clip with drifted tone → decodes with auto-tune on | – | ✅ |
+| FTL-06 | Auto-tune | Shared `Goertzel.power` used by both decoder and detector (no duplicated DSP) | Covered transitively by `MorseAudioDecoder` + `FrequencyPeakDetector` suites | – | – | ✅ |
+
+---
+
+## 12. Memory Optimization — Streaming Buffer Reads (Epic E2)
+
+| Req ID | Feature | Requirement | Unit Tests | Manual Tests | Integration Tests | Status |
+|--------|---------|-------------|-----------|-------------|-------------------|--------|
+| MEM-01 | Streaming | `MorseAudioDecoder` reads in 4096-frame chunks; `streamingChunkFrames` default is 4096 | `MorseAudioDecoder / Decoder: streamingChunkFrames defaults to 4096` | Decode a multi-minute file → peak memory stays bounded (Instruments Allocations) | – | ✅ |
+| MEM-02 | Streaming | Chunked path is behavior-equivalent across chunk boundaries | `MorseAudioDecoder / Small chunk size still decodes SOS (chunk-boundary equivalence)` `/ Round-trip SOS` `/ Round-trip HI` | – | Existing round-trip suite passes unchanged | ✅ |
+
+---
+
+## 13. Visual Decoding — Light-Flash Decode (Epic E3)
+
+| Req ID | Feature | Requirement | Unit Tests | Manual Tests | Integration Tests | Status |
+|--------|---------|-------------|-----------|-------------|-------------------|--------|
+| CV-01 | Light decode | `LightSignalDecoder` round-trips E from a brightness timeline | `LightSignalDecoder / Round-trips single letter E from a brightness timeline` | – | – | ✅ |
+| CV-02 | Light decode | `LightSignalDecoder` round-trips SOS | `LightSignalDecoder / Round-trips SOS from a brightness timeline` | Point camera at another phone flashing SOS → "SOS" decoded | – | ✅ |
+| CV-03 | Light decode | `LightSignalDecoder` round-trips HI | `LightSignalDecoder / Round-trips HI from a brightness timeline` | – | – | ✅ |
+| CV-04 | Light decode | Sub-`minSegmentDuration` flicker is rejected; default threshold 0.5 | `LightSignalDecoder / Sub-threshold flicker shorter than minSegmentDuration is ignored` `/ Default brightness threshold is 0.5` `/ Empty timeline decodes to empty string` | – | – | ✅ |
+| CV-05 | Light decode | Light + audio share `MorseSegmentDecoder` timing logic | `MorseSegmentDecoder / Decodes SOS from ideal segments` `/ Russian language decodes Cyrillic from ideal segments` | – | – | ✅ |
+| CV-06 | Light decode | `VisionFlashDetector` bridges `VNDetectTrajectoriesRequest` ROI luminance → decoder | – | Capture a blinking torch on device → trajectory tracked, message decoded | – | 🔲 (device) |
+
+---
+
+## 14. Control Center Widget — iOS 18 (Epic E4)
+
+| Req ID | Feature | Requirement | Unit Tests | Manual Tests | Integration Tests | Status |
+|--------|---------|-------------|-----------|-------------|-------------------|--------|
+| CTL-01 | Control | `MorseTorchControl` registers an SOS button control in Control Center | – | iOS 18 → add "Morse SOS" control in Control Center editor → appears with flashlight icon | – | 🔲 (device) |
+| CTL-02 | Control | `SendSOSIntent.perform()` flashes SOS via the torch | – | Tap the control → torch blinks `... --- ...` | – | 🔲 (Phase 4) |
+
+---
+
+## 15. Haptic Feedback — CHHapticEngine (Epic E5)
+
+| Req ID | Feature | Requirement | Unit Tests | Manual Tests | Integration Tests | Status |
+|--------|---------|-------------|-----------|-------------|-------------------|--------|
+| HAP-01 | Haptics | `MorseHapticPattern.events` emits one event per on-signal, none for gaps | `MorseHapticPattern / Emits one haptic event per on-signal, none for gaps` `/ Single dot (E) yields exactly one event` `/ Empty text yields no events` | – | – | ✅ |
+| HAP-02 | Haptics | Event times are monotonic and match cumulative signal timing | `MorseHapticPattern / Event times are strictly increasing` `/ First event starts at time zero` | – | – | ✅ |
+| HAP-03 | Haptics | `totalDuration` equals the sum of all signal durations | `MorseHapticPattern / totalDuration equals the sum of all signal durations` | – | – | ✅ |
+| HAP-04 | Haptics | Intensity / sharpness configurable; default intensity 1.0 | `MorseHapticPattern / Default intensity is 1.0 and applied to every event` `/ Custom intensity and sharpness propagate to events` | – | – | ✅ |
+| HAP-05 | Haptics | `MorseHapticPlayer` plays the pattern on supported hardware | – | Transmit on iPhone with haptics → feel dot/dash buzzes in time | – | 🔲 (device) |
+
+---
+
 ## Test File Index
 
 | File | Suite(s) | Test count |
 |------|---------|-----------|
 | `MorseLightTests/MorseConverterTests.swift` | `MorseConverter`, `MorseCode Table` | 19 |
 | `MorseLightTests/MorseCodeLanguageTests.swift` | `MorseLanguage`, `MorseCode.englishTable`, `MorseCode.russianTable`, `MorseCode.spanishTable`, `MorseConverter language support`, `MorseAudioDecoder language support` | 34 |
-| `MorseLightTests/MorseAudioDecoderTests.swift` | `MorseAudioDecoder` | 13 |
+| `MorseLightTests/MorseAudioDecoderTests.swift` | `MorseAudioDecoder` | 17 |
 | `MorseLightTests/MorseCipherTests.swift` | `MorseCipher` | 14 |
 | `MorseLightTests/PINManagerTests.swift` | `PINManager` | 18 |
-| **Total** | | **98** |
+| `MorseLightTests/FrequencyPeakDetectorTests.swift` | `FrequencyPeakDetector` | 6 |
+| `MorseLightTests/MorseSegmentDecoderTests.swift` | `MorseSegmentDecoder` | 5 |
+| `MorseLightTests/MorseHapticPatternTests.swift` | `MorseHapticPattern` | 8 |
+| `MorseLightTests/LightSignalDecoderTests.swift` | `LightSignalDecoder` | 6 |
+| **Total** | | **127** |
 
 ---
 

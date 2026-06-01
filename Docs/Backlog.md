@@ -24,47 +24,58 @@
 
 ---
 
-## Sprint 2 — Your First Game Feature
+## Sprint 2 — Resilience & Accessibility (Epics E1, E2, E5)
 
-> Replace this section with your game-specific stories.
-> Each story should be small enough to implement in one TDD cycle (< 2 hours).
+> Full epic breakdown in `Docs/PLAN.md`. RTM blocks 11, 12, 15.
 
-### Example: Endless Runner
+- [x] **[E1.1]** `FrequencyPeakDetector.dominantFrequency` finds a tone in 600–800 Hz (`FTL-01,02`)
+  - Tests: `FrequencyPeakDetectorTests.swift`
+- [x] **[E1.2]** Detector returns `nil` for silence / sub-noise input (`FTL-03`)
+- [x] **[E1.3]** Default band 600–800 Hz, configurable resolution (`FTL-04`)
+- [x] **[E1.4]** `MorseAudioDecoder.autoTuneFrequency` retunes to the peak (`FTL-05`)
+- [x] **[E1.5]** Extract shared `Goertzel.power`; decoder + detector reuse it (`FTL-06`)
+- [x] **[E2.1]** Decoder streams in 4096-frame chunks (`MEM-01`)
+- [x] **[E2.2]** Chunked path is behavior-equivalent (`MEM-02`)
+- [x] **[E5.1]** `MorseHapticPattern.events` — one event per on-signal (`HAP-01`)
+- [x] **[E5.2]** Monotonic event times matching signal timing (`HAP-02`)
+- [x] **[E5.3]** `totalDuration` sums signal durations (`HAP-03`)
+- [x] **[E5.4]** Configurable intensity / sharpness, default 1.0 (`HAP-04`)
+- [ ] **[E5.5]** `MorseHapticPlayer` plays on device (`HAP-05` — manual)
 
-- [ ] **[Story 2.1]** Player auto-moves right at constant speed
-  - Acceptance: Player position.x increases by `speed * deltaTime` each tick
-  - Tests: `PlayerMovementTests.swift`
+---
 
-- [ ] **[Story 2.2]** Obstacle spawns at the right edge of the world
-  - Acceptance: `ObstacleSpawner` creates `Obstacle` at x = worldWidth
-  - Tests: `ObstacleSpawnerTests.swift`
+## Sprint 3 — Visual Decoding (Epic E3)
 
-- [ ] **[Story 2.3]** Player can jump (single jump, gravity pulls down)
-  - Acceptance: pressing jump sets upward velocity; gravity reduces it each tick
-  - Tests: `JumpMechanicTests.swift`
+> RTM block 13.
 
-- [ ] **[Story 2.4]** Collision with obstacle ends the game
-  - Acceptance: when player overlaps obstacle, `GameEngine.endGame()` is called
-  - Tests: `CollisionTests.swift`
+- [x] **[E3.1]** `LightSignalDecoder` round-trips E / SOS / HI from brightness (`CV-01,02,03`)
+- [x] **[E3.2]** Configurable threshold + flicker rejection (`CV-04`)
+- [x] **[E3.3]** Reuse `MorseSegmentDecoder` (extract shared segment→text) (`CV-05`)
+- [ ] **[E3.4]** `VisionFlashDetector` device bridge (`CV-06` — manual)
 
-- [ ] **[Story 2.5]** Score increases by 1 every 10 meters traveled
-  - Acceptance: score increments at the correct distance milestone
-  - Tests: `DistanceScoreTests.swift`
+---
+
+## Sprint 4 — Control Center (Epic E4)
+
+> RTM block 14. Xcode/device integration (Phase 4).
+
+- [ ] **[E4.1]** `MorseTorchControl` registers an iOS 18 control (`CTL-01` — manual)
+- [ ] **[E4.2]** `SendSOSIntent` flashes SOS via torch (`CTL-02` — Phase 4)
 
 ---
 
 ## Backlog (Future Sprints)
 
-- [ ] Enemy AI that follows player (GameplayKit)
-- [ ] Power-up pickup increases speed temporarily
-- [ ] Game Center leaderboard integration
-- [ ] Settings screen: mute audio, change controls
-- [ ] Haptic feedback on collision (CoreHaptics)
-- [ ] iCloud save sync (CloudKit)
-- [ ] Accessibility: VoiceOver support for menus
+- [ ] Live camera preview overlay with decoded text (E3 UI)
+- [ ] Settings: per-message haptic intensity preset
+- [ ] Game Center / leaderboard removed — not applicable to MorseLight
+- [ ] iCloud sync of saved transmissions (CloudKit)
+- [ ] Accessibility: VoiceOver labels across all sections
 
 ---
 
 ## Done
 
-See Sprint 1 above.
+- Sprint 1 — Foundation (see above)
+- Sprint 2 — Epics E1, E2, E5 pure-logic stories (device stories pending Xcode)
+- Sprint 3 — Epic E3 pure-logic stories (Vision bridge pending device)
