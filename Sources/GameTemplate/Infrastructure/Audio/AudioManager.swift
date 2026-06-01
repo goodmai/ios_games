@@ -16,12 +16,12 @@ enum BackgroundMusic: String, Sendable {
 }
 
 protocol AudioManaging: Sendable {
-    func play(_ effect: SoundEffect)
-    func play(_ music: BackgroundMusic)
-    func stop()
-    func setVolume(_ volume: Float)
-    var isMuted: Bool { get }
-    func toggleMute()
+    func play(_ effect: SoundEffect) async
+    func play(_ music: BackgroundMusic) async
+    func stop() async
+    func setVolume(_ volume: Float) async
+    var isMuted: Bool { get async }
+    func toggleMute() async
 }
 
 actor AudioManager: AudioManaging {
@@ -29,14 +29,14 @@ actor AudioManager: AudioManaging {
     private var volume: Float = 1.0
     private var currentMusic: BackgroundMusic?
 
-    nonisolated func play(_ effect: SoundEffect) {
+    func play(_ effect: SoundEffect) {
         guard !isMuted else { return }
         // Hook into AVFoundation or SpriteKit audio in the real implementation
     }
 
-    nonisolated func play(_ music: BackgroundMusic) {
+    func play(_ music: BackgroundMusic) {
         guard !isMuted else { return }
-        Task { await self.setCurrentMusic(music) }
+        self.setCurrentMusic(music)
     }
 
     func stop() {

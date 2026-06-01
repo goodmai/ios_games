@@ -2,6 +2,7 @@ import Foundation
 
 // Entry point composition root — wire up all dependencies here.
 // In a real iOS app this would be marked @main and import SwiftUI.
+@MainActor
 struct GameApp {
     let state: GameState
     let engine: GameEngine
