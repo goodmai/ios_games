@@ -50,7 +50,9 @@ targets:
       - path: MorseLightWidget
       - path: MorseLight/Domain/MorseCode.swift
       - path: MorseLight/Domain/MorseConverter.swift
+      - path: MorseLight/Domain/TorchSchedule.swift
       - path: MorseLight/Infrastructure/FlashlightController.swift
+      - path: MorseLight/Infrastructure/TorchMorseTransmitter.swift
     info:
       path: MorseLightWidget/Info.plist
       properties:

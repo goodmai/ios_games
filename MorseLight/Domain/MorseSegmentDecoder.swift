@@ -10,6 +10,11 @@ struct MorseSegmentDecoder: Sendable {
 
     var language: MorseLanguage = .english
 
+    /// Convergence threshold for the dot/dash k-means calibration: the loop stops
+    /// once the largest centroid shift drops below this (Δμ < ε).
+    var convergenceEpsilon: Double = 0.0005
+    var maxIterations: Int = 50
+
     func text(from segments: [MorseSegment]) -> String {
         let onDurations = segments.filter { $0.isOn }.map { $0.duration }
         guard !onDurations.isEmpty else { return "" }
@@ -52,25 +57,9 @@ struct MorseSegmentDecoder: Sendable {
     // MARK: Calibrate unit duration via K-means (k=2)
 
     private func estimateUnit(from onDurations: [TimeInterval]) -> TimeInterval {
-        guard !onDurations.isEmpty else { return 0.1 }
-        guard onDurations.count > 1 else { return onDurations[0] }
-
-        let sorted = onDurations.sorted()
-
-        var c1 = sorted.first!
-        var c2 = sorted.last!
-
-        for _ in 0..<20 {
-            let mid = (c1 + c2) / 2.0
-            let dots = sorted.filter { $0 <= mid }
-            let dashes = sorted.filter { $0 > mid }
-            if dots.isEmpty || dashes.isEmpty { break }
-            let newC1 = dots.reduce(0, +) / Double(dots.count)
-            let newC2 = dashes.reduce(0, +) / Double(dashes.count)
-            if abs(newC1 - c1) < 0.001 && abs(newC2 - c2) < 0.001 { break }
-            c1 = newC1; c2 = newC2
-        }
-        return c1   // dot cluster mean = 1 unit
+        let kmeans = KMeans1D(epsilon: convergenceEpsilon, maxIterations: maxIterations)
+        guard let clusters = kmeans.cluster(onDurations) else { return 0.1 }
+        return clusters.low   // dot cluster mean = 1 unit
     }
 }
 </content>

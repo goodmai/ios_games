@@ -21,30 +21,24 @@ struct MorseTorchControl: ControlWidget {
     }
 }
 
-/// Flashes `... --- ...` on the device torch. Runs in the control's extension
-/// process via `FlashlightController` + `MorseConverter`.
+/// Flashes `... --- ...` on the device torch.
+///
+/// `openAppWhenRun` moves the actual transmission into the foreground app
+/// process: a Control Center extension has a strict CPU/Watchdog budget, and a
+/// multi-second SOS would risk the system terminating the control. The app has no
+/// such limit. Timing uses `TorchMorseTransmitter`'s absolute-deadline scheduler
+/// so a long signal does not drift.
 @available(iOS 18.0, *)
 struct SendSOSIntent: AppIntent {
 
     static let title: LocalizedStringResource = "Send SOS via Torch"
     static let description = IntentDescription("Transmits SOS in Morse code using the device torch.")
+    static let openAppWhenRun = true
 
+    @MainActor
     func perform() async throws -> some IntentResult {
-        let torch = FlashlightController()
-        guard torch.isAvailable else { return .result() }
-
         let signals = MorseConverter().signals(for: "SOS")
-        defer { torch.turnOff() }
-        for signal in signals {
-            switch signal {
-            case .on(let duration):
-                try? torch.setOn(true)
-                try? await Task.sleep(for: .seconds(duration))
-            case .off(let duration):
-                torch.turnOff()
-                try? await Task.sleep(for: .seconds(duration))
-            }
-        }
+        await TorchMorseTransmitter().transmit(signals: signals)
         return .result()
     }
 }
