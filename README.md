@@ -58,6 +58,10 @@ open Package.swift
 # Cmd+R to run on iPhone Simulator
 ```
 
+### Run on Physical iPhone
+For detailed instructions on how to build and run the application on your physical iPhone:
+*   [Руководство по установке на iPhone (На русском)](Docs/iOS-Deployment-RU.md)
+
 ### Run linter
 ```bash
 swift Scripts/lint.swift
