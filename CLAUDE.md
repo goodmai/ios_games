@@ -200,7 +200,7 @@ Always separate test commit from implementation commit.
 ```bash
 swift test
 # or
-bash Scripts/test.sh
+swift Scripts/test.swift
 ```
 
 ### Specific test suite
@@ -212,12 +212,12 @@ swift test --filter "StartGame Use Case"
 
 ### Watch mode (auto-rerun on file change)
 ```bash
-bash Scripts/test-watch.sh
+swift Scripts/test-watch.swift
 ```
 
 ### Linting
 ```bash
-bash Scripts/lint.sh
+swift Scripts/lint.swift
 ```
 
 ### Build check (no tests)
@@ -295,7 +295,7 @@ Cmd+R  → Run on simulator
 - [ ] Test: all mutations (each method gets at least one test)
 - [ ] Test: edge cases (zero, negative, boundary values)
 - [ ] Run `swift test` → all green
-- [ ] Lint: `bash Scripts/lint.sh`
+- [ ] Lint: `swift Scripts/lint.swift`
 
 ## Adding a New Use Case (Checklist)
 

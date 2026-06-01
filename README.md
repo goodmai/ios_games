@@ -32,7 +32,7 @@ following strict TDD and Clean Architecture principles.
 ```bash
 git clone https://github.com/goodmai/ios_games.git
 cd ios_games
-bash Scripts/setup.sh
+swift Scripts/setup.swift
 ```
 
 ### Run all tests (terminal, no Xcode needed)
@@ -42,14 +42,12 @@ swift test
 
 ### Run tests with verbose output
 ```bash
-bash Scripts/test.sh
+swift Scripts/test.swift
 ```
 
 ### Watch mode — tests re-run on every file save
 ```bash
-bash Scripts/test-watch.sh
-# Requires: brew install fswatch  (macOS)
-#           apt install inotify-tools  (Linux)
+swift Scripts/test-watch.swift
 ```
 
 ### Open in Xcode (macOS)
@@ -62,7 +60,7 @@ open Package.swift
 
 ### Run linter
 ```bash
-bash Scripts/lint.sh
+swift Scripts/lint.swift
 # Requires: brew install swiftlint
 ```
 
