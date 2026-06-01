@@ -64,5 +64,22 @@ final class MorseLightUITests: XCTestCase {
         XCTAssertTrue(decoded.waitForExistence(timeout: 30))
         XCTAssertEqual(decoded.label, "SOS")
     }
+
+    // MARK: - Epic E5: haptics transmit control present
+
+    func testHapticsTransmitButtonExists() {
+        let app = launchApp()
+        XCTAssertTrue(app.buttons["transmitHaptics"].waitForExistence(timeout: 15))
+    }
+
+    // MARK: - Epic E3: camera light decoder is reachable
+
+    func testLightDecoderScreenOpens() {
+        let app = launchApp()
+        let link = app.buttons["decodeLightLink"]
+        XCTAssertTrue(link.waitForExistence(timeout: 15))
+        link.tap()
+        XCTAssertTrue(app.buttons["lightCaptureButton"].waitForExistence(timeout: 10))
+    }
 }
 </content>
