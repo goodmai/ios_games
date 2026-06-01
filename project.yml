@@ -49,12 +49,26 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.goodmai.MorseLightTests
 
+  MorseLightUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: MorseLightUITests
+    dependencies:
+      - target: MorseLight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.goodmai.MorseLightUITests
+        TEST_TARGET_NAME: MorseLight
+
 schemes:
   MorseLight:
     build:
       targets:
         MorseLight: all
         MorseLightTests: [test]
+        MorseLightUITests: [test]
     run:
       config: Debug
     test:
@@ -63,6 +77,8 @@ schemes:
         - name: MorseLightTests
           parallelizable: true
           randomExecutionOrder: true
+        - name: MorseLightUITests
+          parallelizable: false
     profile:
       config: Release
     analyze:

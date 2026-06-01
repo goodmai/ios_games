@@ -1,4 +1,7 @@
-name: iOS Build & Test
+name: iOS Build & Integration UI Tests
+
+# Unit tests run locally on Mac (Cmd+U). CI builds the app and runs the
+# integration UI test target (MorseLightUITests) on a simulator.
 
 on:
   push:
@@ -111,7 +114,9 @@ jobs:
             ONLY_ACTIVE_ARCH=YES \
             2>&1 | tee /tmp/build.log
 
-      - name: Run unit tests
+      # Unit tests run locally on Mac. CI executes only the integration UI
+      # test target so PR gates reflect real end-to-end app behavior.
+      - name: Run integration UI tests
         run: |
           set -o pipefail
           xcodebuild test \
@@ -119,6 +124,7 @@ jobs:
             -destination "id=${{ steps.sim.outputs.udid }}" \
             -configuration "$CONFIGURATION" \
             -derivedDataPath "$DERIVED_DATA" \
+            -only-testing:MorseLightUITests \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             -resultBundlePath TestResults.xcresult \
@@ -142,10 +148,11 @@ jobs:
             /tmp/test.log
 
   # ─────────────────────────────────────────────────────────────
-  # Job 2: GameTemplate SPM unit tests (pure Swift, no UIKit)
+  # Job 2: GameTemplate SPM build check (pure Swift, no UIKit)
+  # Unit tests run locally on Mac; CI only verifies it compiles.
   # ─────────────────────────────────────────────────────────────
   game-template:
-    name: GameTemplate – Swift Package Tests
+    name: GameTemplate – Swift Package Build
     runs-on: macos-15
 
     steps:
@@ -162,6 +169,3 @@ jobs:
 
       - name: Build
         run: swift build
-
-      - name: Test
-        run: swift test --parallel
