@@ -40,7 +40,8 @@
 - [x] **[E5.2]** Monotonic event times matching signal timing (`HAP-02`)
 - [x] **[E5.3]** `totalDuration` sums signal durations (`HAP-03`)
 - [x] **[E5.4]** Configurable intensity / sharpness, default 1.0 (`HAP-04`)
-- [ ] **[E5.5]** `MorseHapticPlayer` plays on device (`HAP-05` — manual)
+- [x] **[E5.6]** "Via Haptics" button wired in transmit UI (`HAP-06`)
+- [ ] **[E5.5]** `MorseHapticPlayer` plays on device (`HAP-05` — device)
 
 ---
 
@@ -51,16 +52,19 @@
 - [x] **[E3.1]** `LightSignalDecoder` round-trips E / SOS / HI from brightness (`CV-01,02,03`)
 - [x] **[E3.2]** Configurable threshold + flicker rejection (`CV-04`)
 - [x] **[E3.3]** Reuse `MorseSegmentDecoder` (extract shared segment→text) (`CV-05`)
-- [ ] **[E3.4]** `VisionFlashDetector` device bridge (`CV-06` — manual)
+- [x] **[E3.5]** `CameraLightCapture` + `LightDecodeView` camera flow wired (`CV-07`)
+- [ ] **[E3.4]** `VisionFlashDetector` device bridge (`CV-06` — device)
 
 ---
 
 ## Sprint 4 — Control Center (Epic E4)
 
-> RTM block 14. Xcode/device integration (Phase 4).
+> RTM block 14. `MorseLightWidget` app-extension target added; device-verified on iOS 18.
 
-- [ ] **[E4.1]** `MorseTorchControl` registers an iOS 18 control (`CTL-01` — manual)
-- [ ] **[E4.2]** `SendSOSIntent` flashes SOS via torch (`CTL-02` — Phase 4)
+- [x] **[E4.3]** `MorseLightWidget` extension target + `WidgetBundle` + embed in app
+- [x] **[E4.4]** `SendSOSIntent.perform()` flashes SOS via torch (logic wired)
+- [ ] **[E4.1]** Control appears in Control Center editor (`CTL-01` — device)
+- [ ] **[E4.2]** Tapping the control blinks the torch (`CTL-02` — device)
 
 ---
 

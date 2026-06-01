@@ -217,6 +217,7 @@
 | CV-04 | Light decode | Sub-`minSegmentDuration` flicker is rejected; default threshold 0.5 | `LightSignalDecoder / Sub-threshold flicker shorter than minSegmentDuration is ignored` `/ Default brightness threshold is 0.5` `/ Empty timeline decodes to empty string` | – | – | ✅ |
 | CV-05 | Light decode | Light + audio share `MorseSegmentDecoder` timing logic | `MorseSegmentDecoder / Decodes SOS from ideal segments` `/ Russian language decodes Cyrillic from ideal segments` | – | – | ✅ |
 | CV-06 | Light decode | `VisionFlashDetector` bridges `VNDetectTrajectoriesRequest` ROI luminance → decoder | – | Capture a blinking torch on device → trajectory tracked, message decoded | – | 🔲 (device) |
+| CV-07 | Light decode UI | `CameraLightCapture` samples per-frame luminance; `LightDecodeView` start/stop → decoded text | – | Open "Decode Light (Camera)" → aim at blinking torch → Stop & Decode shows text | `MorseLightUITests / testLightDecoderScreenOpens` | ✅ (UI) / 🔲 (device decode) |
 
 ---
 
@@ -224,8 +225,8 @@
 
 | Req ID | Feature | Requirement | Unit Tests | Manual Tests | Integration Tests | Status |
 |--------|---------|-------------|-----------|-------------|-------------------|--------|
-| CTL-01 | Control | `MorseTorchControl` registers an SOS button control in Control Center | – | iOS 18 → add "Morse SOS" control in Control Center editor → appears with flashlight icon | – | 🔲 (device) |
-| CTL-02 | Control | `SendSOSIntent.perform()` flashes SOS via the torch | – | Tap the control → torch blinks `... --- ...` | – | 🔲 (Phase 4) |
+| CTL-01 | Control | `MorseTorchControl` registers an SOS button control in Control Center (via `MorseLightWidget` extension) | – | iOS 18 → add "Morse SOS" control in Control Center editor → appears with flashlight icon | – | 🔲 (device) |
+| CTL-02 | Control | `SendSOSIntent.perform()` flashes SOS via the torch (`FlashlightController` + `MorseConverter`) | – | Tap the control → torch blinks `... --- ...` | – | 🔲 (device) |
 
 ---
 
@@ -238,6 +239,7 @@
 | HAP-03 | Haptics | `totalDuration` equals the sum of all signal durations | `MorseHapticPattern / totalDuration equals the sum of all signal durations` | – | – | ✅ |
 | HAP-04 | Haptics | Intensity / sharpness configurable; default intensity 1.0 | `MorseHapticPattern / Default intensity is 1.0 and applied to every event` `/ Custom intensity and sharpness propagate to events` | – | – | ✅ |
 | HAP-05 | Haptics | `MorseHapticPlayer` plays the pattern on supported hardware | – | Transmit on iPhone with haptics → feel dot/dash buzzes in time | – | 🔲 (device) |
+| HAP-06 | Haptics UI | "Via Haptics" transmit button drives `MorseHapticPlayer` (gated by hardware support) | – | Type message → tap "Via Haptics" → feel Morse; button disabled on unsupported HW | `MorseLightUITests / testHapticsTransmitButtonExists` | ✅ (UI) / 🔲 (device) |
 
 ---
 
@@ -315,6 +317,9 @@
 | INT-08 | UI: E1+E2 decode round-trip "SOS" through the live pipeline | `MorseLightUITests / testDecodeSelfTestRoundTripsSOS` | ✅ |
 | INT-09 | UI: E1 auto-tune decode round-trip "SOS" | `MorseLightUITests / testDecodeSelfTestWithAutoTuneRoundTripsSOS` | ✅ |
 
-> **CI policy:** unit tests run locally on Mac (`Cmd+U`); CI builds the app and runs
-> the `MorseLightUITests` integration target on a simulator (see
-> `.github/workflows/ios-build.yml`).
+| INT-10 | UI: camera light decoder screen opens with capture control | `MorseLightUITests / testLightDecoderScreenOpens` | ✅ |
+| INT-11 | UI: haptics transmit control present | `MorseLightUITests / testHapticsTransmitButtonExists` | ✅ |
+
+> **CI policy:** all tests (unit + integration UI) run locally on Mac (`Cmd+U`).
+> CI is build-only — it compiles the app, the widget extension, and the
+> `GameTemplate` package (see `.github/workflows/ios-build.yml`).
